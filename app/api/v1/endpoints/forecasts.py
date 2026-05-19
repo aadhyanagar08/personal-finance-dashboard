@@ -4,16 +4,22 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.limiter import limiter
+from app.core.security import verify_token
 from app.db.models import Forecast, Transaction
 from app.db.session import get_db
 from app.ml.forecast import SpendingForecaster
 
-router = APIRouter(prefix="/forecasts", tags=["forecasts"])
+router = APIRouter(
+    prefix="/forecasts",
+    tags=["forecasts"],
+    dependencies=[Depends(verify_token)],
+)
 
 # Module-level singleton shared between refresh trigger and forecast reads.
 _forecaster = SpendingForecaster()
@@ -68,7 +74,7 @@ async def _retrain_and_persist(forecaster: SpendingForecaster) -> None:
     """Pull all historical transactions, retrain Prophet per category, persist."""
     import asyncio
     import pandas as pd
-    from sqlalchemy import text
+
     from app.db.session import AsyncSessionLocal
 
     async with AsyncSessionLocal() as session:
@@ -97,7 +103,9 @@ async def _retrain_and_persist(forecaster: SpendingForecaster) -> None:
     summary="30-day forecast summary",
     description="Next 30-day projected spend aggregated by category, sourced from the Forecast table.",
 )
+@limiter.limit("1000/minute")
 async def forecast_summary(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ForecastSummary:
     today = date.today()
@@ -131,7 +139,9 @@ async def forecast_summary(
     summary="90-day category forecast",
     description="Returns the next 90 days of predicted spend with confidence bands for the given category.",
 )
+@limiter.limit("1000/minute")
 async def category_forecast(
+    request: Request,
     category: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     periods: Annotated[int, Query(ge=1, le=365)] = 90,
@@ -174,12 +184,13 @@ async def category_forecast(
     summary="Refresh forecasts",
     description="Triggers background retraining of Prophet models for all categories, then persists fresh forecasts.",
 )
+@limiter.limit("1000/minute")
 async def refresh_forecasts(
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
     forecaster: Annotated[SpendingForecaster, Depends(get_forecaster)],
 ) -> RefreshResponse:
-    # Count distinct categories to report back immediately.
     result = await db.execute(
         select(func.count(Transaction.category.distinct()))
     )

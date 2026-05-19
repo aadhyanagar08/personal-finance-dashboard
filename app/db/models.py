@@ -57,6 +57,19 @@ class Forecast(Base):
     )
 
 
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = (Index("ix_users_email", "email"),)
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    email = Column(String(255), nullable=False, unique=True)
+    hashed_password = Column(String(255), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class Asset(Base):
     __tablename__ = "assets"
 

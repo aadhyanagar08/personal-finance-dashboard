@@ -3,9 +3,13 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.core.logging import configure_logging, get_logger
+from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.forecasts import router as forecasts_router
 from app.api.v1.endpoints.portfolio import router as portfolio_router
 from app.api.v1.endpoints.transactions import router as transactions_router
@@ -47,6 +51,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -55,6 +63,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(ml_router, prefix="/api/v1")
 app.include_router(transactions_router, prefix="/api/v1")
 app.include_router(forecasts_router, prefix="/api/v1")

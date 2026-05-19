@@ -4,16 +4,22 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.limiter import limiter
+from app.core.security import verify_token
 from app.db.models import Transaction
 from app.db.session import get_db
 from app.ml.categorizer import TransactionCategorizer, categorize_pending_transactions
 
-router = APIRouter(prefix="/transactions", tags=["transactions"])
+router = APIRouter(
+    prefix="/transactions",
+    tags=["transactions"],
+    dependencies=[Depends(verify_token)],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +99,9 @@ def _build_filters(
     summary="List transactions",
     description="Paginated transaction list, optionally filtered by date range, category, or anomaly flag.",
 )
+@limiter.limit("1000/minute")
 async def list_transactions(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -130,7 +138,9 @@ async def list_transactions(
     summary="Create transaction",
     description="Create a new transaction. If no category is supplied the record is saved as 'Uncategorized' and a background task auto-categorizes it.",
 )
+@limiter.limit("1000/minute")
 async def create_transaction(
+    request: Request,
     payload: TransactionCreate,
     background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -163,7 +173,9 @@ async def create_transaction(
     summary="Transaction summary",
     description="Returns total income, total expenses, net savings, and savings rate for a date range.",
 )
+@limiter.limit("1000/minute")
 async def transaction_summary(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start of date range (inclusive)"),
     date_to: date = Query(..., description="End of date range (inclusive)"),
@@ -203,7 +215,9 @@ async def transaction_summary(
     summary="List anomalous transactions",
     description="Returns only transactions flagged as anomalies, with the same pagination and date filters.",
 )
+@limiter.limit("1000/minute")
 async def list_anomalies(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,

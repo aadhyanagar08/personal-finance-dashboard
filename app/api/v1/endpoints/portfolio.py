@@ -6,18 +6,24 @@ from decimal import Decimal
 from typing import Annotated
 
 import yfinance as yf
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.limiter import limiter
 from app.core.logging import get_logger
+from app.core.security import verify_token
 from app.db.models import Asset, PriceHistory
 from app.db.session import get_db
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+router = APIRouter(
+    prefix="/portfolio",
+    tags=["portfolio"],
+    dependencies=[Depends(verify_token)],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +106,9 @@ def _fetch_live_prices(tickers: list[str]) -> dict[str, dict]:
     summary="Current portfolio holdings",
     description="Returns all tracked assets with live prices fetched from yfinance.",
 )
+@limiter.limit("1000/minute")
 async def get_portfolio(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> PortfolioOut:
     result = await db.execute(select(Asset).order_by(Asset.ticker))
@@ -140,7 +148,9 @@ async def get_portfolio(
     summary="Portfolio price history",
     description="Returns OHLCV price history for all assets, useful for charting.",
 )
+@limiter.limit("1000/minute")
 async def portfolio_history(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     days: Annotated[int, Query(ge=1, le=3650, description="Number of trailing days")] = 90,
 ) -> PortfolioHistory:
@@ -161,7 +171,6 @@ async def portfolio_history(
     )
     rows = history_result.scalars().all()
 
-    # Group by asset
     grouped: dict[str, list[PricePoint]] = {a.ticker: [] for a in assets}
     for row in rows:
         ticker = asset_map.get(row.asset_id)
@@ -194,7 +203,9 @@ async def portfolio_history(
         "30-day return, annualised volatility, and Sharpe ratio computed from stored price history."
     ),
 )
+@limiter.limit("1000/minute")
 async def portfolio_metrics(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> PortfolioMetrics:
     import math
@@ -210,7 +221,6 @@ async def portfolio_metrics(
 
     asset_ids = [a.id for a in assets]
 
-    # Fetch 31 days of history so we can compute 30-day returns
     history_result = await db.execute(
         select(PriceHistory)
         .where(
@@ -224,7 +234,6 @@ async def portfolio_metrics(
     if not rows:
         return PortfolioMetrics()
 
-    # Group closes by asset
     by_asset: dict[int, list[tuple[date, float]]] = {}
     for row in rows:
         by_asset.setdefault(row.asset_id, []).append((row.date, float(row.close)))
@@ -244,14 +253,12 @@ async def portfolio_metrics(
         total_value += latest_close
         total_prev_close += prev_close
 
-        # 30-day return: compare latest with the oldest point in window
         oldest_in_window = next(
             (close for dt, close in series if dt >= cutoff_30d), None
         )
         if oldest_in_window and oldest_in_window > 0:
             returns_30d.append((latest_close - oldest_in_window) / oldest_in_window * 100)
 
-        # Daily log returns for volatility / Sharpe
         closes = [c for _, c in series]
         for i in range(1, len(closes)):
             if closes[i - 1] > 0:
@@ -267,7 +274,7 @@ async def portfolio_metrics(
         import statistics
         std = statistics.stdev(daily_returns_all)
         mean = statistics.mean(daily_returns_all)
-        volatility = std * math.sqrt(252) * 100  # annualised %
+        volatility = std * math.sqrt(252) * 100
         sharpe = (mean * 252) / (std * math.sqrt(252)) if std > 0 else None
 
     return PortfolioMetrics(
