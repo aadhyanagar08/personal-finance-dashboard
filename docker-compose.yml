@@ -45,6 +45,21 @@ services:
       postgres:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # Frontend (React + Vite, served by nginx)
+  # The app talks directly to the backend API at http://localhost:8000 from
+  # the browser, so no proxy is needed here.
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
 # ---------------------------------------------------------------------------
 # Named volumes
 # ---------------------------------------------------------------------------

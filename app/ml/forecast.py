@@ -21,6 +21,7 @@ _MODEL_VERSION = "prophet-v1"
 class SpendingForecaster:
     def __init__(self) -> None:
         self._models: dict[str, Prophet] = {}
+        self._hist_avg: dict[str, float] = {}  # category → mean daily spend (for capping)
 
     # ------------------------------------------------------------------
     # Training
@@ -33,19 +34,40 @@ class SpendingForecaster:
         df["y"] = df["amount"].astype(float).abs()
 
         for category, group in df.groupby("category"):
-            daily = group.groupby("ds")["y"].sum().reset_index()
-            if len(daily) < 2:
+            sparse = group.groupby("ds")["y"].sum().reset_index()
+            if len(sparse) < 2:
                 logger.warning("skipping category — insufficient history", category=category)
                 continue
+
+            # Fill missing days with 0 — sparse non-zero-only data causes Prophet
+            # to wildly overfit and extrapolate inflated forecasts.
+            full_range = pd.date_range(sparse["ds"].min(), sparse["ds"].max(), freq="D")
+            daily = (
+                sparse.set_index("ds")
+                .reindex(full_range, fill_value=0.0)
+                .rename_axis("ds")
+                .reset_index()
+            )
+
+            hist_avg = float(daily["y"].mean())
+            self._hist_avg[str(category)] = hist_avg
+
             model = Prophet(
-                yearly_seasonality=True,
+                growth="flat",              # no trend — prevents spurious up/down drift on sparse data
+                yearly_seasonality=False,   # insufficient data (<1 yr) to fit yearly wave
                 weekly_seasonality=True,
                 daily_seasonality=False,
+                changepoint_prior_scale=0.05,  # low flexibility — prevents overfitting small datasets
                 interval_width=0.95,
             )
             model.fit(daily)
             self._models[str(category)] = model
-            logger.info("prophet fitted", category=category, rows=len(daily))
+            logger.info(
+                "prophet fitted",
+                category=category,
+                rows=len(daily),
+                hist_avg=round(hist_avg, 2),
+            )
 
     # ------------------------------------------------------------------
     # Forecasting
@@ -58,7 +80,21 @@ class SpendingForecaster:
         model = self._models[category]
         future = model.make_future_dataframe(periods=periods, freq="D")
         fc = model.predict(future)
-        return fc[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(periods).reset_index(drop=True)
+        result = fc[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(periods).reset_index(drop=True)
+
+        # Cap at 3× historical daily average to prevent exploding forecasts.
+        hist_avg = self._hist_avg.get(category)
+        if hist_avg is not None and hist_avg > 0:
+            cap = hist_avg * 3
+            result["yhat"] = result["yhat"].clip(lower=0, upper=cap)
+            result["yhat_upper"] = result["yhat_upper"].clip(lower=0, upper=cap)
+            result["yhat_lower"] = result["yhat_lower"].clip(lower=0)
+        else:
+            result["yhat"] = result["yhat"].clip(lower=0)
+            result["yhat_lower"] = result["yhat_lower"].clip(lower=0)
+            result["yhat_upper"] = result["yhat_upper"].clip(lower=0)
+
+        return result
 
     # ------------------------------------------------------------------
     # Persistence
