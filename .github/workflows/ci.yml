@@ -1,0 +1,129 @@
+name: CI
+
+# Triggers:
+#   - every push to every branch
+#   - every pull request
+#   - when called by another workflow (e.g. deploy.yml) via workflow_call
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: ruff check — lint
+        run: ruff check .
+
+      - name: ruff format --check — style
+        run: ruff format --check .
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Test  (needs lint)
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test & Coverage
+    needs: lint
+    runs-on: ubuntu-latest
+
+    # Postgres service container — available at localhost:5432 inside the job.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: finplatform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d finplatform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project and dev dependencies
+        run: pip install -e ".[dev]"
+
+      # Prophet's cmdstanpy backend requires CmdStan at runtime.
+      # install_cmdstan() downloads a pre-compiled binary (~200 MB); the
+      # GitHub-hosted runner caches ~/.cmdstan between runs automatically
+      # when the step output is cached.
+      - name: Cache CmdStan
+        id: cache-cmdstan
+        uses: actions/cache@v4
+        with:
+          path: ~/.cmdstan
+          key: cmdstan-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install CmdStan (if not cached)
+        if: steps.cache-cmdstan.outputs.cache-hit != 'true'
+        run: python -c "import cmdstanpy; cmdstanpy.install_cmdstan()"
+
+      - name: Run pytest with coverage
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/finplatform
+          SECRET_KEY: ci-test-secret-key-not-for-production-use
+          ENVIRONMENT: dev
+          DEBUG: "false"
+        # --cov-report=xml generates coverage.xml for the artifact upload.
+        # --cov=app, --cov-fail-under=70, and --cov-report=term-missing come
+        # from [tool.pytest.ini_options].addopts in pyproject.toml.
+        run: pytest --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Docker build  (needs lint, runs in parallel with test)
+  # ---------------------------------------------------------------------------
+  build:
+    name: Docker Build
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the multi-stage image using the GHA layer cache.
+      # push: false — we only verify the build succeeds; actual push happens
+      # in deploy.yml after all CI jobs pass.
+      - name: Build Docker image (verify only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: financial-intelligence-platform:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

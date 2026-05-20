@@ -1,0 +1,44 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+dist
+build
+.eggs
+
+# Virtual environments
+.venv
+venv
+env
+
+# Test and coverage
+.pytest_cache
+.coverage
+coverage.xml
+htmlcov
+tests
+
+# Dev tooling
+.ruff_cache
+.mypy_cache
+
+# Local data (models are trained at runtime or mounted separately)
+data/models
+data/*.csv
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Editor
+.DS_Store
+.idea
+.vscode
+*.swp

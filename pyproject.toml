@@ -33,6 +33,7 @@ dev = [
     "httpx>=0.27.0",
     "pytest-cov>=6.0.0",
     "aiosqlite>=0.20.0",
+    "ruff>=0.4.0",
 ]
 
 [tool.pytest.ini_options]
@@ -58,3 +59,27 @@ exclude_lines = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+# =============================================================================
+# Ruff — linter and formatter
+# =============================================================================
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# E/W: pycodestyle  F: pyflakes  I: isort  UP: pyupgrade
+select = ["E", "F", "I", "UP", "W"]
+ignore = [
+    "E501",   # line-too-long — formatter handles this
+    "UP007",  # use X | Y instead of Optional — keep Optional for clarity
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
