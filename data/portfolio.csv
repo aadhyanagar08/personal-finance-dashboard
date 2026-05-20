@@ -1,0 +1,14 @@
+symbol,exchange,name,security_type,quantity,market_price,market_price_currency,book_value_cad,market_value_cad,unrealized_return_cad
+ATZ,TSX,Aritzia Inc,EQUITY,1.0,134.25,CAD,133.23,134.25,1.02
+BANK,TSX,Evolve Canadian Banks And Lifecos Enhanced Yield Index Fund,ETF,89.0827,10.53,CAD,849.05,938.04,88.99
+DEF,TSX-V,Defiance Silver Corp,EQUITY,15.0,0.2075,CAD,6.08,3.11,-2.97
+ENB,TSX,Enbridge Inc,EQUITY,5.5871,78.22,CAD,367.15,437.02,69.87
+GOOG,TSX,Alphabet CDR (CAD Hedged),EQUITY,12.0016,61.71,CAD,568.88,740.62,171.74
+JCPB,NYSE,JPMorgan Core Plus Bond ETF,ETF,2.0544,46.97,USD,138.32,96.50,−1.39
+PACB,NASDAQ,Pacific Biosciences of California Inc,EQUITY,10.0,1.15,USD,29.14,11.50,-9.38
+PHYS,TSX,Sprott Physical Gold Trust,EQUITY,5.1259,46.63,CAD,209.29,239.02,29.73
+PNG,TSX-V,Kraken Robotics Inc,EQUITY,10.9443,7.44,CAD,89.30,81.43,-7.87
+PSLV,TSX,Sprott Physical Silver Trust,EQUITY,5.4792,32.83,CAD,121.66,179.88,58.22
+THX,TSX-V,Thor Explorations Ltd,EQUITY,10.0977,1.27,CAD,15.13,12.82,-2.31
+XIC,TSX,BlackRock iShares Core S&P/TSX Capped Composite Index ETF,ETF,1.0165,53.94,CAD,44.58,54.83,10.25
+XIU,TSX,BlackRock Canada iShares S&P/TSX 60 Index ETF,ETF,0.882,49.94,CAD,36.50,44.05,7.55
