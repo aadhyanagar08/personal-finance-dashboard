@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Optional
 
 import joblib
 import pandas as pd
@@ -24,7 +25,7 @@ _UNCATEGORIZED = "Uncategorized"
 
 class TransactionCategorizer:
     def __init__(self) -> None:
-        self._pipeline: Pipeline | None = None
+        self._pipeline: Optional[Pipeline] = None
 
     def train(self, labeled_df: pd.DataFrame) -> None:
         """Fit TF-IDF + LogisticRegression on description → category."""

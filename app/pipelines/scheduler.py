@@ -1,5 +1,6 @@
 import asyncio
 import time
+from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -11,7 +12,7 @@ logger = get_logger(__name__)
 # Default tickers to refresh daily. Override via settings if needed.
 _DEFAULT_TICKERS = ["SPY", "QQQ", "AAPL", "MSFT", "GOOGL", "AMZN", "BRK-B"]
 
-_scheduler: AsyncIOScheduler | None = None
+_scheduler: Optional[AsyncIOScheduler] = None
 
 
 def get_scheduler() -> AsyncIOScheduler:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
@@ -32,8 +32,8 @@ class TransactionOut(BaseModel):
     date: date
     amount: Decimal
     category: str
-    description: str | None
-    source: str | None
+    description: Optional[str]
+    source: Optional[str]
     is_anomaly: bool
 
     model_config = {"from_attributes": True}
@@ -42,8 +42,8 @@ class TransactionOut(BaseModel):
 class TransactionCreate(BaseModel):
     date: date
     amount: Decimal = Field(..., description="Positive = income, negative = expense")
-    description: str | None = None
-    source: str | None = None
+    description: Optional[str] = None
+    source: Optional[str] = None
     category: str = "Uncategorized"
 
 
@@ -60,7 +60,7 @@ class TransactionSummary(BaseModel):
     total_income: Decimal
     total_expenses: Decimal
     net_savings: Decimal
-    savings_rate: float | None = Field(
+    savings_rate: Optional[float] = Field(
         None, description="Net savings / total income, null when income is zero"
     )
 
@@ -71,10 +71,10 @@ class TransactionSummary(BaseModel):
 
 
 def _build_filters(
-    date_from: date | None,
-    date_to: date | None,
-    category: str | None,
-    is_anomaly: bool | None,
+    date_from: Optional[date],
+    date_to: Optional[date],
+    category: Optional[str],
+    is_anomaly: Optional[bool],
 ) -> list:
     filters = []
     if date_from:
@@ -105,10 +105,10 @@ async def list_transactions(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    category: str | None = None,
-    is_anomaly: bool | None = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    category: Optional[str] = None,
+    is_anomaly: Optional[bool] = None,
 ) -> PaginatedTransactions:
     filters = _build_filters(date_from, date_to, category, is_anomaly)
     where = and_(*filters) if filters else True
@@ -221,9 +221,9 @@ async def list_anomalies(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    category: str | None = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    category: Optional[str] = None,
 ) -> PaginatedTransactions:
     filters = _build_filters(date_from, date_to, category, is_anomaly=True)
     where = and_(*filters)

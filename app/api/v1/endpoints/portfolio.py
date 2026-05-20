@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Optional
 
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -33,11 +33,11 @@ router = APIRouter(
 
 class Holding(BaseModel):
     ticker: str
-    name: str | None
-    asset_type: str | None
-    current_price: float | None
-    daily_change: float | None = Field(None, description="Absolute price change vs previous close")
-    daily_change_pct: float | None = Field(None, description="Percentage change vs previous close")
+    name: Optional[str]
+    asset_type: Optional[str]
+    current_price: Optional[float]
+    daily_change: Optional[float] = Field(None, description="Absolute price change vs previous close")
+    daily_change_pct: Optional[float] = Field(None, description="Percentage change vs previous close")
 
 
 class PortfolioOut(BaseModel):
@@ -47,11 +47,11 @@ class PortfolioOut(BaseModel):
 
 class PricePoint(BaseModel):
     date: date
-    open: Decimal | None
-    high: Decimal | None
-    low: Decimal | None
+    open: Optional[Decimal]
+    high: Optional[Decimal]
+    low: Optional[Decimal]
     close: Decimal
-    volume: int | None
+    volume: Optional[int]
 
 
 class AssetHistory(BaseModel):
@@ -64,12 +64,12 @@ class PortfolioHistory(BaseModel):
 
 
 class PortfolioMetrics(BaseModel):
-    total_value: float | None = Field(None, description="Sum of latest close prices across all assets")
-    daily_change: float | None = Field(None, description="Total daily price change across holdings")
-    daily_change_pct: float | None
-    return_30d: float | None = Field(None, description="Percentage price change over the last 30 days")
-    volatility_30d: float | None = Field(None, description="Annualised 30-day return volatility")
-    sharpe_ratio: float | None = Field(None, description="Annualised Sharpe ratio (risk-free rate = 0)")
+    total_value: Optional[float] = Field(None, description="Sum of latest close prices across all assets")
+    daily_change: Optional[float] = Field(None, description="Total daily price change across holdings")
+    daily_change_pct: Optional[float] = None
+    return_30d: Optional[float] = Field(None, description="Percentage price change over the last 30 days")
+    volatility_30d: Optional[float] = Field(None, description="Annualised 30-day return volatility")
+    sharpe_ratio: Optional[float] = Field(None, description="Annualised Sharpe ratio (risk-free rate = 0)")
 
 
 # ---------------------------------------------------------------------------
@@ -268,8 +268,8 @@ async def portfolio_metrics(
     daily_change_pct = (daily_change / total_prev_close * 100) if total_prev_close > 0 else None
     return_30d = (sum(returns_30d) / len(returns_30d)) if returns_30d else None
 
-    volatility: float | None = None
-    sharpe: float | None = None
+    volatility: Optional[float] = None
+    sharpe: Optional[float] = None
     if len(daily_returns_all) > 1:
         import statistics
         std = statistics.stdev(daily_returns_all)

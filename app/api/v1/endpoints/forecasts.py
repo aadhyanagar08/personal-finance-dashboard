@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
@@ -37,8 +37,8 @@ def get_forecaster() -> SpendingForecaster:
 class ForecastPoint(BaseModel):
     forecast_date: date
     predicted_amount: Decimal
-    confidence_lower: Decimal | None
-    confidence_upper: Decimal | None
+    confidence_lower: Optional[Decimal]
+    confidence_upper: Optional[Decimal]
 
     model_config = {"from_attributes": True}
 

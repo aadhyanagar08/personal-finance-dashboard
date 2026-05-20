@@ -11,11 +11,12 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, relationship
 from sqlalchemy.sql import func
 
 
 class Base(DeclarativeBase):
+    __allow_unmapped__ = True
     pass
 
 
@@ -108,4 +109,4 @@ class PriceHistory(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    asset: "Asset" = relationship("Asset", back_populates="price_history")
+    asset: Mapped["Asset"] = relationship("Asset", back_populates="price_history")

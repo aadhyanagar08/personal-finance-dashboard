@@ -2,6 +2,7 @@ import asyncio
 import random
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Optional, Union
 
 import pandas as pd
 import yfinance as yf
@@ -76,9 +77,9 @@ _CATEGORIES: dict[str, dict] = {
 
 
 async def fetch_market_data(
-    tickers: list[str],
-    session: AsyncSession | None = None,
-) -> dict[str, int]:
+    tickers: list,
+    session: Optional[AsyncSession] = None,
+) -> dict:
     """Download 2 years of daily OHLCV for each ticker and upsert to DB.
 
     Returns {ticker: rows_upserted}.  Safe to re-run — existing rows are
@@ -162,8 +163,8 @@ def _build_price_rows(asset_id: int, hist: pd.DataFrame) -> list[dict]:
 
 
 async def fetch_transactions(
-    session: AsyncSession | None = None,
-    csv_path: Path | str | None = None,
+    session: Optional[AsyncSession] = None,
+    csv_path: Optional[Union[Path, str]] = None,
 ) -> int:
     """Load transactions from CSV if it exists, else generate synthetic data.
 

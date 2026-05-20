@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from typing import Optional
 
 import pandas as pd
 from prophet import Prophet
@@ -67,7 +68,7 @@ class SpendingForecaster:
         self,
         category: str,
         periods: int = 90,
-        session: AsyncSession | None = None,
+        session: Optional[AsyncSession] = None,
     ) -> int:
         """Forecast *category* and write results to the Forecast table.
 
